@@ -64,16 +64,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kredis"
-version = "0.1.0"
-dependencies = [
- "env_logger",
- "log",
- "radis_impl",
- "radis_lib",
-]
-
-[[package]]
 name = "libc"
 version = "0.2.149"
 source = "registry+https://github.com/rust-lang/crates.io-index"
