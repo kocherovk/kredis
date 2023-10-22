@@ -3,9 +3,8 @@ use std::io::Write;
 use std::net::{TcpListener, TcpStream};
 use std::thread;
 
-use radis_impl::plaintext;
-
 use log::{debug, info};
+use radis_impl::plaintext::PlainTextReader;
 use radis_lib::io::{Command, Key, Val};
 use std::sync::{Arc, Mutex};
 
@@ -52,11 +51,11 @@ fn main() -> std::io::Result<()> {
 }
 
 fn handle_client(store: &Mutex<HashMap<Key, Val>>, mut stream: TcpStream) {
-    loop {
-        let command = plaintext::read_stream(&mut stream).expect("Failed to read command");
+    let reader = PlainTextReader::new(stream.try_clone().unwrap());
 
+    for command in reader {
         debug!("command {:?}", command);
-        let result = execute(store, command);
+        let result = execute(store, command.unwrap());
 
         if let Some(res) = result {
             stream.write(&res).unwrap();
