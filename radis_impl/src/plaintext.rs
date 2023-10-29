@@ -1,9 +1,9 @@
-use log::{debug, warn};
+use log::warn;
 use radis_lib::io::Command;
 use std::io::BufReader;
 use std::io::{BufRead, Read};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum InvalidCommand {
     EmptyCommand,
     UnknownCommand,
@@ -100,39 +100,73 @@ mod tests {
 
     #[test]
     fn read_get() {
-        let input = "get 1".as_bytes();
-        let mut reader = PlainTextReader::new(input);
-        let command = reader.next().unwrap().unwrap();
-        assert_eq!(command, Get { key: "1".into() })
+        let input = "get key";
+        let mut commands = PlainTextReader::new(input.as_bytes());
+        assert_eq!(commands.next(), Some(Ok(Get { key: "key".into() })));
+    }
+
+    #[test]
+    fn read_from_empty_stream() {
+        let input = "";
+        let mut commands = PlainTextReader::new(input.as_bytes());
+        assert_eq!(commands.next(), None);
     }
 
     #[test]
     fn read_set() {
-        let input = "set 2 3".as_bytes();
-        let mut reader = PlainTextReader::new(input);
-        let command = reader.next().unwrap().unwrap();
+        let input = "set 1 2";
+        let mut commands = PlainTextReader::new(input.as_bytes());
         assert_eq!(
-            command,
-            Set {
-                key: "2".into(),
-                val: "3".into()
-            }
-        )
+            commands.next(),
+            Some(Ok(Set { key: "1".into() , val: "2".into()}))
+        );
+    }
+
+    #[test]
+    fn read_unknown_command() {
+        let input = "unknown 1 2";
+        let mut commands = PlainTextReader::new(input.as_bytes());
+        assert_eq!(
+            commands.next(),
+            Some(Err(InvalidCommand::UnknownCommand))
+        );
+    }
+
+    #[test]
+    fn test_get_command_wrong_number_of_args() {
+        let input = "get 1 2\nget";
+        let mut commands = PlainTextReader::new(input.as_bytes());
+        assert_eq!(commands.next(),Some(Err(InvalidCommand::WrongNumberOfArgs)));
+        assert_eq!(commands.next(),Some(Err(InvalidCommand::WrongNumberOfArgs)));
+    }
+
+    #[test]
+    fn test_set_command_wrong_number_of_args() {
+        let input = "set\nset 1\nset 1 2 3";
+        let mut commands = PlainTextReader::new(input.as_bytes());
+        assert_eq!(commands.next(),Some(Err(InvalidCommand::WrongNumberOfArgs)));
+        assert_eq!(commands.next(),Some(Err(InvalidCommand::WrongNumberOfArgs)));
+        assert_eq!(commands.next(),Some(Err(InvalidCommand::WrongNumberOfArgs)));
+    }
+
+    #[test]
+    fn read_empty_command() {
+        let input = "\n";
+        let mut commands = PlainTextReader::new(input.as_bytes());
+        assert_eq!(commands.next(),Some(Err(InvalidCommand::EmptyCommand)));
     }
 
     #[test]
     fn read_multiple_commands() {
-        let input = "set 4 5\nget 6".as_bytes();
-        let mut reader = PlainTextReader::new(input);
-        let command = reader.next().unwrap().unwrap();
+        let input = "set 4 5\nget 6";
+        let mut commands = PlainTextReader::new(input.as_bytes());
         assert_eq!(
-            command,
-            Set {
-                key: "4".into(),
-                val: "5".into()
-            }
+            commands.next(),
+            Some(Ok(Set {key: "4".into(), val: "5".into()}))
         );
-        let command = reader.next().unwrap().unwrap();
-        assert_eq!(command, Get { key: "6".into() });
+        assert_eq!(
+            commands.next(),
+            Some(Ok(Get { key: "6".into() }))
+        );
     }
 }
