@@ -1,16 +1,24 @@
-use log::debug;
+use log::{debug, warn};
 use radis_lib::io::Command;
 use std::io::BufReader;
 use std::io::{BufRead, Read};
 
+
+
 #[derive(Debug)]
-pub struct InvalidCommand;
+pub enum InvalidCommand {
+    EmptyCommand,
+    UnknownCommand,
+    WrongNumberOfArgs
+}
 
 #[derive(Debug)]
 pub enum CommandCode {
     Get,
     Set,
 }
+
+const MAX_SYMBOLS_PER_COMMAND: u64 = 1024;
 
 impl TryInto<CommandCode> for &str {
     type Error = InvalidCommand;
@@ -19,7 +27,7 @@ impl TryInto<CommandCode> for &str {
         match self {
             "get" => Ok(CommandCode::Get),
             "set" => Ok(CommandCode::Set),
-            _ => Err(InvalidCommand),
+            _ => Err(InvalidCommand::UnknownCommand),
         }
     }
 }
@@ -31,35 +39,62 @@ pub struct PlainTextReader<R> {
 impl<R: Read> PlainTextReader<R> {
     pub fn new(stream: R) -> PlainTextReader<R> {
         PlainTextReader {
+            // reader: BufReader::new(stream.take(MAX_SYMBOLS_PER_COMMAND)),
             reader: BufReader::new(stream),
         }
     }
 }
+
+fn parse_command(line: &str) -> Result<Command, InvalidCommand> {
+    let mut command_string = line.trim().split(' ');
+    let command_name = match command_string.next() {
+        Some(code) => code,
+        None => { return Err(InvalidCommand::EmptyCommand) }
+    };
+
+    let command_code = command_name.try_into()?;
+    debug!("command code {:?}", command_code);
+
+    let mut command_string = command_string.map(| arg | Vec::from(arg.as_bytes()) );
+
+    let command = match command_code {
+        CommandCode::Get => {
+            let key = command_string.next().ok_or(InvalidCommand::WrongNumberOfArgs)?;
+            if command_string.next().is_some() {
+                return Err(InvalidCommand::WrongNumberOfArgs)
+            }
+            Command::Get { key }
+        }
+        CommandCode::Set => {
+            let key = command_string.next().ok_or(InvalidCommand::WrongNumberOfArgs)?;
+            let val = command_string.next().ok_or(InvalidCommand::WrongNumberOfArgs)?;
+            if command_string.next().is_some() {
+                return Err(InvalidCommand::WrongNumberOfArgs)
+            }
+            Command::Set { key, val }
+        }
+    };
+
+    return Ok(command);
+}
+
 
 impl<S: Read> Iterator for PlainTextReader<S> {
     type Item = Result<Command, InvalidCommand>;
 
     fn next(&mut self) -> Option<<Self as Iterator>::Item> {
         let mut line = String::new();
-        self.reader.read_line(&mut line).unwrap();
 
-        let mut command_string = line.trim_end().split(' ');
-        let command_code = command_string.next().unwrap().try_into().unwrap();
-        debug!("command code {:?}", command_code);
+        let read_result = self.reader.read_line(&mut line);
+        if let Ok(0) = read_result {
+            return None
+        }
+        if let Err(error) = read_result {
+            warn!("error reading command: {:?}", error);
+            return None
+        }
 
-        let command = match command_code {
-            CommandCode::Get => {
-                let key = command_string.next().unwrap().as_bytes().into();
-                Command::Get { key: key }
-            }
-            CommandCode::Set => {
-                let key = command_string.next().unwrap().as_bytes().into();
-                let val = command_string.next().unwrap().as_bytes().into();
-                Command::Set { key: key, val: val }
-            }
-        };
-
-        return Some(Ok(command));
+        return Some(parse_command(&line));
     }
 }
 
