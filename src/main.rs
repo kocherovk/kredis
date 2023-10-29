@@ -57,7 +57,10 @@ fn handle_client(store: &dyn Storage<Key, Val>, mut stream: TcpStream) {
     for command_result in reader {
         let command = match command_result {
             Ok(cmd) => cmd,
-            Err(err) => { debug!("error reading command {:?}", err); continue }
+            Err(err) => {
+                debug!("error reading command {:?}", err);
+                continue;
+            }
         };
 
         debug!("command {:?}", command);
