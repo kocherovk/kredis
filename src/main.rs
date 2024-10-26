@@ -4,7 +4,7 @@ use std::ops::Deref;
 use std::thread;
 
 use log::{debug, info};
-use radis_impl::plaintext::PlainTextReader;
+use radis_impl::reader::plaintext::PlainTextReader;
 use radis_impl::storage::hashmap::HashMapStorage;
 use radis_lib::io::{Command, Key, Val};
 use radis_lib::storage::Storage;

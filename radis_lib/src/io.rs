@@ -6,3 +6,13 @@ pub enum Command {
     Set { key: Key, val: Val },
     Get { key: Key },
 }
+
+#[derive(Debug, PartialEq)]
+pub enum InvalidCommand {
+    EmptyCommand,
+    UnknownCommand,
+    WrongNumberOfArgs,
+    ReadError,
+}
+
+pub trait CommandReader: IntoIterator<Item=Result<Command, InvalidCommand>> {}

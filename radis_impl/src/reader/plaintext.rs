@@ -1,15 +1,8 @@
 use log::warn;
-use radis_lib::io::Command;
+use radis_lib::io::{Command, CommandReader, InvalidCommand};
 use std::io::BufReader;
 use std::io::{BufRead, Read};
 
-#[derive(Debug, PartialEq)]
-pub enum InvalidCommand {
-    EmptyCommand,
-    UnknownCommand,
-    WrongNumberOfArgs,
-    ReadError,
-}
 
 #[derive(Debug)]
 pub enum CommandCode {
@@ -29,12 +22,12 @@ impl TryInto<CommandCode> for &str {
     }
 }
 
-pub struct PlainTextReader<R> {
+pub struct PlainTextReader {
     reader: BufReader<R>,
 }
 
-impl<R: Read> PlainTextReader<R> {
-    pub fn new(stream: R) -> PlainTextReader<R> {
+impl PlainTextReader {
+    pub fn new(stream: dyn Read) -> PlainTextReader {
         PlainTextReader {
             reader: BufReader::new(stream),
         }
@@ -71,6 +64,20 @@ fn parse_command(line: &str) -> Result<Command, InvalidCommand> {
         None => return Err(InvalidCommand::EmptyCommand),
     };
     build_command(command_name.try_into()?, command_string)
+}
+
+
+impl<S: Read> IntoIterator for PlainTextReader<S> {
+    type Item = Result<Command, InvalidCommand>;
+    type IntoIter = Self;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self
+    }
+}
+
+impl <S> CommandReader for PlainTextReader<S> {
+
 }
 
 impl<S: Read> Iterator for PlainTextReader<S> {
